@@ -166,6 +166,18 @@ func waitForService(client *http.Client, url string, retries uint64) error {
 	return nil
 }
 
+func deletePods(client kubernetes.Interface, label string) error {
+	podClient := client.CoreV1().Pods("default")
+	pods, err := podClient.List(metav1.ListOptions{LabelSelector: "app=" + label})
+	if err != nil {
+		return err
+	}
+	for _, pod := range pods.Items {
+		podClient.Delete(pod.Name, nil)
+	}
+	return nil
+}
+
 func main() {
 	parseFlags()
 	envToken := os.Getenv("ACCESS_TOKEN")
@@ -294,6 +306,15 @@ func main() {
 	})
 	k8sLocalClientSet.AppsV1().Deployments("kube-system").Delete("tiller-deploy", nil)
 	k8sLocalClientSet.CoreV1().Services("kube-system").Delete("tiller-deploy", nil)
+
+	if *robotAuthentication {
+		// Work around https://github.com/googlecloudrobotics/core/issues/59:
+		// if the cr-syncer is already running, it is using a
+		// no-longer-valid token, so delete the pod to restart it.
+		if err := deletePods(k8sLocalClientSet, "cr-syncer"); err != nil {
+			log.Printf("Failed to delete cr-syncer pods: %v", err)
+		}
+	}
 
 	appManagement := configutil.GetBoolean(vars, "APP_MANAGEMENT", true)
 	// Use "robot" as a suffix for consistency for Synk deployments.
