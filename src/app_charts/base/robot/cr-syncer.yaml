@@ -16,6 +16,8 @@ spec:
       containers:
       - name: cr-syncer
         args:
+        - -v=9
+        - -stderrthreshold=INFO
         - -remote-server
         - {{ .Values.domain }}
         - --robot-name
